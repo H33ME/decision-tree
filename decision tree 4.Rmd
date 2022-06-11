@@ -53,9 +53,11 @@ creditBoost<- xgboost(data=creditX,label=creditY,max.depth=3,eta=.3,nthread=4,nr
 creditboost20<-xgboost(data = creditX,label = creditY,max.depth=20,eta=.3,nthread=4,nrounds = 10,objective="binary:logistic")
 ```
 By default xgboost prints the evaluation metric result for each round.As the number of rounds increase the metric gets better as well. Visualizing the boosted tree is achieved using the **htmlwidgets -diagrammeR package** which contains the _xgb.plot.multi.trees()_ that try to amalgamate the numerous trees into one visualization. Install _DiagrammeR_ by calling _install.package("DiagrammeR")_ and load it using _library(DiagrammeR)_.
-After installing DiagrammeR call; _xgb.plot.multi.trees(creditBoost,feature_names = colnames(creditX),fill=TRUE)_
+After installing DiagrammeR call; 
 ```{r plot-xgboost-trees}
-
-#use xgb.plot.importance to plot the trees
+library(DiagrammeR)
+#plot the trees
+xgb.plot.multi.trees(creditBoost,feature_names = colnames(creditX),fill=TRUE)
+#use xgb.plot.importance to plot a graph that shows the most important variable to the model which is Duration and CreditAmount  
 xgb.plot.importance(xgb.importance(creditBoost,feature_names = colnames(creditX)))
 ```
