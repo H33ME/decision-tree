@@ -1,0 +1,61 @@
+---
+title: "Decision Tree"
+author: "H33M"
+date: '2022-06-11'
+output: html_document
+---
+
+# Decision tree
+
+A relative modern technique for fitting nonlinear models.It work for both regression and classification by performing binary split on the recursive predictor. Tree can be calculated with the _rpart function_ in **rpart package**. It uses formula interface but does not work with interaction.
+```{r create-credit-variable}
+creditNames<- c("Checking",	"Duration",	"CreditHistory",	"Purpose", 	"CreditAmount",	"Savings",	"Employment", 	"InstallmentRate",	"GenderMarital",	"OtherDebtors", 	"YearsAtResidence",	"RealEstate",	"Age", 	"OtherInstallment",	"Housing",	"ExistingCredits",	"Job",	"NumLiable",	"Phone",	"Foreign",	"Credit")
+credit<- read.table("C:/Users/Herman/Documents/credit/german.data",sep = " ",stringsAsFactors = FALSE,col.names = creditNames,header = FALSE)
+head(credit)
+```
+
+```{r create-tree-using-rpart}
+library(rpart)
+creditTree<- rpart(Credit~CreditAmount+Age+CreditHistory+Employment,data=credit)
+creditTree
+```
+Plotting will be easier to read the results. 
+Plot using _rpart.plot()_.
+```{r plot-creditTree}
+library(rpart.plot)
+rpart.plot(creditTree)
+```
+Decision trees are unstable with high variance due to over fitting. a slight change in the training data can cause a significant difference in the model. Therefore we boost the prediction using _xgboost_ from **xgboost package**.
+
+# Boosted tree
+
+Boosting is a popular way to improve prediction particularly for decision tree. First ___the model is fit on the data with all observation having equal weight___. then the observation for the model that was poorly performed are upweighted and the observation for the model that performed well are downweighted and a new model is fit.This process is repeated a number of times and the final model is the accumulation of these little models. Two common function are used for fitting boosted trees ie _gbm_ from the **gbm package** and _xgboost_ from **xgboost package**. lets check the ___xgboost function___ since its the most popular of the two. unlike _rpart_ we cannot use formula interface thus we must create a **predictor matrix** and a **response vector**.The response vector must be 0 and 1 and **not** a logical vector.
+```{r create-matrix-and-vector}
+	credit$Credit	<-	ifelse(credit$Credit	==	1,	"Good",	"Bad")
+credit$Credit	<-	factor(credit$Credit,	levels=c("Good",	"Bad")) 
+library(useful)
+#the formula that describe the model
+#we dont need an interface since its a tree
+creditFormula<-Credit~CreditHistory+Purpose+Employment+Duration+Age+CreditAmount-1
+#we use all levels of the categorical variables since its a tree
+creditX<- build.x(creditFormula,data=credit,contrasts=FALSE)
+creditY<- build.y(creditFormula,data=credit)
+#convert the logical vector to [0,1]
+creditY<- as.integer(relevel(creditY,ref = "Bad"))-1
+```
+The predictor matrix and response vector are supplied to the _data_ and _label argument_ repectively in the _xgboost()_. the _nrounds argument_ determines the number of pass in the data.too many pass can lead to overfiting.learning rate is controlled by _eta_ with a lower number leading to less overfitting. The maximum depth of trees is indicated by _max.depth_. _nthread argument_ controls the parallel thread.Type of model is specified with the _objective argument_.
+```{r boosting-the-prediction}
+library(xgboost)
+creditBoost<- xgboost(data=creditX,label=creditY,max.depth=3,eta=.3,nthread=4,nrounds=10,objective="binary:logistic")
+```
+
+```{r predict-for-max.depth-20}
+creditboost20<-xgboost(data = creditX,label = creditY,max.depth=20,eta=.3,nthread=4,nrounds = 10,objective="binary:logistic")
+```
+By default xgboost prints the evaluation metric result for each round.As the number of rounds increase the metric gets better as well. Visualizing the boosted tree is achieved using the **htmlwidgets -diagrammeR package** which contains the _xgb.plot.multi.trees()_ that try to amalgamate the numerous trees into one visualization. Install _DiagrammeR_ by calling _install.package("DiagrammeR")_ and load it using _library(DiagrammeR)_.
+After installing DiagrammeR call; _xgb.plot.multi.trees(creditBoost,feature_names = colnames(creditX),fill=TRUE)_
+```{r plot-xgboost-trees}
+
+#use xgb.plot.importance to plot the trees
+xgb.plot.importance(xgb.importance(creditBoost,feature_names = colnames(creditX)))
+```
